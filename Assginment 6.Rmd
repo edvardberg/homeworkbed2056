@@ -1,0 +1,134 @@
+---
+title: "covid/liquidation"
+author: "Edvard berg"
+date: "12 10 2020"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(rvest)
+library(tidyverse)
+library(purrr)
+library(lubridate)
+library(dplyr)
+
+#leser linkene for Q 1 - 4, 2019 og 2020. Trenger begge for å kunne sammenligne, og de måtte hentes ned i Q 1-4 grunner størrelse. 
+
+#2019
+Q1_19 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.01.2019&datoTil=01.03.2019&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+Q2_19 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.03.2019&datoTil=01.06.2019&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+Q3_19 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.06.2019&datoTil=01.09.2019&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+Q4_19 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.09.2019&datoTil=31.12.2019&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+#2020
+Q1_20 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.01.2020&datoTil=01.03.2020&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+Q2_20 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.03.2020&datoTil=01.06.2020&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+Q3_20 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.06.2020&datoTil=01.09.2020&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+#Q4_20 vil være fra 01.09.20-dd (12.10.20)
+Q4_20 <- read_html("https://w2.brreg.no/kunngjoring/kombisok.jsp?datoFra=01.09.2020&datoTil=12.10.2020&id_region=0&id_niva1=51&id_niva2=-+-+-&id_bransje1=0")
+
+#Brukte denne linken for å finne nodes: "https://blog.rstudio.com/2014/11/24/rvest-easy-web-scraping-with-r/" sammen med selectorgadget
+Q1_19 <-Q1_19 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+Q2_19 <-Q2_19 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+ 
+Q3_19 <-Q3_19 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+Q4_19 <-Q4_19 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+Q1_20 <-Q1_20 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+Q2_20 <-Q2_20 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+Q3_20 <-Q3_20 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+Q4_20 <-Q4_20 %>%
+  html_nodes(xpath = "//table[(((count(preceding-sibling::*) + 1) = 6) and parent::*)]//td") %>%
+  html_nodes("table")%>%
+  html_table(fill = TRUE)
+
+
+#samler alle datasettene og filterer for de relevante dataene. 
+
+df_Q<- bind_rows(Q1_19,Q2_19,Q3_19,Q4_19,Q1_20,Q2_20,Q3_20,Q4_20)
+
+
+df_Q<- df_Q %>%
+  select(.,X2,X4,X6,X8) %>%
+   mutate(region=ifelse(grepl("[^Dato][A-Za-z]", X6), X6, NA)) %>% 
+  fill(region)%>%
+  filter(X8 == "Konkursåpning") %>%
+  filter(nchar(X4)>8)
+
+#Nå er det kun 6800 observasjoner, flitert for konkursåpning og orgnr, og sortert etter fylke istedefor firmanavn
+
+df_Q<- df_Q%>%
+  mutate(df_Q$X6 <-as.Date(df_Q$X6, format = "%d.%m.%Y"))
+colnames(df_Q)<- c("Bedriftsnavn","Org.nummer","År/måned","Status","Fylke","Dato")
+
+
+df_Q<-df_Q %>%
+  mutate(
+    dates2=ymd(Dato),
+    År=year(dates2),
+    Måned=month(dates2),
+    Dag=day(dates2)
+  )
+#Henter ut de variablene jeg trenger
+
+df_Q<- df_Q%>%
+  select(Bedriftsnavn,Status, Fylke,År, Måned)
+colnames(df_Q)<-c("Bedriftsnavn","Status","Fylke","År","Måned")
+
+# Konkurser på flykesnivå og legger til år som faktor
+df_Q<- df_Q%>%
+  group_by(Fylke,Måned, År)%>%
+  count(Status)
+
+df_Q$År<-as.factor(df_Q$År)
+```
+
+Her ser vi utviklingen av konkurser. Det man kan si er at det er nokså likt forrige år, men hvordan utviklingen blir er vanskeligere å si.
+
+```{r,message = FALSE, warrning= FALSE,echo=TRUE}
+# PLot
+df_Q%>%
+  ggplot(aes(x=Måned, y=n, group=År))+
+  geom_line(aes(color=År),size=1)+
+  facet_wrap(~Fylke)+
+  scale_x_continuous(breaks=c(1:23))+
+  ylab("Antall")+
+  ggtitle("Konkurser i Norge på fylkesnivå",
+          subtitle = " 01.01.2019 - 12.10.2020 ")
+
+``` 
+
+
